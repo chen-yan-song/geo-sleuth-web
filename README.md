@@ -8,21 +8,24 @@
 ## 架构（当前实现）
 
 ```
-浏览器 UI ──► Cloudflare Worker ──► Cursor Cloud Agent
+浏览器 UI ──► Cloudflare Worker ──► Cursor Cloud Agent（按 API Key 复用 sticky / 暖机）
                  │                      │
-                 ├─ 不存用户 Key         ├─ 默认无仓库（AGENT_REPO_URL=none）
-                 └─ 内嵌 skill 归档（/skill.tgz）──► Agent 拉取校验后解压到 .agents/skills/geo-sleuth
+                 ├─ Key 不落库；KV 只存 sha256(key)→agentId
+                 ├─ POST /api/warmup 预装 skill+依赖（不做分析）
+                 └─ 内嵌 skill 归档（/skill.tgz）──► Agent 拉取校验后解压
                                         （禁止 git clone / npx skills 装技能）
 ```
 
 | 部件 | 说明 |
 |---|---|
-| `web/` | 静态页：Key、上传、轮询、结果 |
-| `worker/` | Hono API：创建/查询/取消 Cloud Agent |
+| `web/` | 静态页：Key、预热、上传、轮询、结果 |
+| `worker/` | Hono API：创建/复用/查询/取消 Cloud Agent + warmup |
 | `.agents/skills/geo-sleuth/` | 技能源码（vendoring） |
 | `worker/src/generated/skill-archive.ts` | 由 `pack:skill` 生成的内嵌 gzip 归档 |
+| `AGENT_POOL` KV | 可选；绑定后同一 Key 复用暖机 Agent |
 
-**不会**再把 Cloud Agent 绑到 `Oldcircle/geo-sleuth` 远程仓；技能只从后端包注入。
+**不会**再把 Cloud Agent 绑到 `Oldcircle/geo-sleuth` 远程仓；技能只从后端包注入。  
+**不会**为提速砍掉 sat/OCR 等技能步骤；暖机只预装环境。
 
 ## 内置技能怎么更新
 
@@ -48,16 +51,24 @@ npm run dev
 浏览器打开终端提示地址（通常 `http://127.0.0.1:8787`）。
 
 1. 在 [Cursor Dashboard → API Keys](https://cursor.com/dashboard?tab=integrations) 创建 Key  
-2. 粘贴到页面 → 上传照片 → 开始分析  
-3. 可用「在 Cursor 打开 Agent」看云端进度  
+2. 粘贴到页面 →（可选）点「预热环境」→ 上传照片 → 开始分析  
+3. 可用「在 Cursor 打开 Agent」看云端进度；同一 Key 的后续任务会跟进到同一 sticky Agent  
 
-健康检查：`GET /api/health` 应含 `skillBundled: true`。
+健康检查：`GET /api/health` 应含 `skillBundled: true`；绑定 KV 后还有 `agentPoolKv: true`。
 
 ## 部署到 Cloudflare
 
+先创建（或复用）KV，把 id 写入 `wrangler.toml` 的 `AGENT_POOL`：
+
 ```bash
+npx wrangler login   # 或设置 CLOUDFLARE_API_TOKEN
+npx wrangler kv namespace create AGENT_POOL
+npx wrangler kv namespace create AGENT_POOL --preview
+# 将输出的 id / preview_id 填进 wrangler.toml
 npm run deploy
 ```
+
+未绑定 KV 时服务仍可部署运行，但每次任务都会新建 Agent（无暖机复用）。
 
 可选环境变量（`wrangler.toml` 或 Dashboard）：
 
@@ -74,13 +85,22 @@ npm run deploy
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `POST` | `/api/tasks` | 创建任务；头 `X-Cursor-Api-Key`；体：`imageBase64`、`mimeType`、可选 `prompt` |
-| `GET` | `/api/tasks/:agentId/:runId` | 轮询状态与结果；需带同一 Key |
+| `POST` | `/api/tasks` | 创建或**复用** sticky Agent 跑完整分析；头 `X-Cursor-Api-Key`；体：`imageBase64`、`mimeType`、可选 `prompt`。响应含 `reused` / `warm` |
+| `POST` | `/api/warmup` | 预热：确保 sticky Agent，只装 skill+依赖，不做照片分析 |
+| `GET` | `/api/pool` | 暖池状态。无 Key 只返回是否绑定 KV；有 Key 返回该 Key 的 sticky 摘要 |
+| `GET` | `/api/tasks/:agentId/:runId` | 轮询状态与结果；需带同一 Key（预热 run 结束时会把 sticky 标为 ready） |
 | `POST` | `/api/tasks/:agentId/:runId/cancel` | 取消 run |
-| `GET` | `/api/health` | 健康检查（含 `skillBundled`、`skillArchiveSha256`） |
+| `GET` | `/api/health` | 健康检查（含 `skillBundled`、`agentPoolKv`） |
 | `GET` | `/skill.tgz` | 内嵌技能归档，供云端 Agent 拉取 |
 
-Key 仅经请求头透传，服务端不落库。
+Key 仅经请求头透传；服务端不存原始 Key，KV 只存 `sha256(key)` → `{ agentId, warmedAt, … }`。  
+同一 sticky Agent 同时只能跑一个 run（Cursor `409 agent_busy`）；请等结束或取消后再提交。
+
+### 暖机限制
+
+- 复用依赖 Cursor Cloud Agents **follow-up** API：`POST /v1/agents/{id}/runs`（已实现）。Agent 被归档/过期时会清 KV 并新建。
+- Cursor 侧 VM 可能休眠；follow-up 仍走同一 agent/workspace，但休眠唤醒可能仍有延迟。
+- 未配置 `AGENT_POOL` KV 时暖机接口返回 503，分析仍可走「每次新建」。
 
 ## 目录速览
 
