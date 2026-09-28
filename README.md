@@ -3,6 +3,7 @@
 公网页最小可上线骨架：用户**自填 Cursor API Key（BYOK）**，上传照片后，后端代理调用 **Cursor Cloud Agents API**，用**后端内嵌的 geo-sleuth 技能**做拍摄地点分析，并尽量推荐近同机位网络照片。
 
 - 仓库：https://github.com/chen-yan-song/geo-sleuth-web
+- 线上：https://geo-sleuth-web.yifan2848.workers.dev
 
 ## 架构（当前实现）
 
