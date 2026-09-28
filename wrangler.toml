@@ -8,7 +8,9 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 [vars]
-# none / 留空：无仓库 Cloud Agent（推荐）。技能由 Worker 内嵌包注入，不远程安装。
+# 云端 Agent 从这里的 /skill.tgz 拉取内嵌技能包；本地 wrangler dev 时云端访问不到 localhost，所以固定写线上地址
+PUBLIC_BASE_URL = "https://geo-sleuth-web.yifan2848.workers.dev"
+# none / 留空：无仓库 Cloud Agent（推荐）。技能由 Worker 内嵌包提供，不从 GitHub/npm 安装。
 # 若填写，须为「你自己 GitHub 上、且已连接 Cursor」的仓库；不要填 Oldcircle/geo-sleuth。
 AGENT_REPO_URL = "none"
 AGENT_REPO_REF = "main"

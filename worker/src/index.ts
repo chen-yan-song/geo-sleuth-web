@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import {
   SKILL_ARCHIVE_BASE64,
   SKILL_ARCHIVE_BYTES,
+  SKILL_ARCHIVE_SHA256,
   SKILL_ROOT_REL,
 } from "./generated/skill-archive";
 
@@ -11,7 +12,21 @@ type Env = {
   AGENT_REPO_URL: string;
   AGENT_REPO_REF: string;
   AGENT_MODEL_ID?: string;
+  /** 云端 Agent 能访问到的本服务公网地址；本地开发时须指向线上地址 */
+  PUBLIC_BASE_URL?: string;
 };
+
+let skillArchiveBytes: Uint8Array | null = null;
+
+function getSkillArchive(): Uint8Array {
+  if (!skillArchiveBytes) {
+    const bin = atob(SKILL_ARCHIVE_BASE64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    skillArchiveBytes = out;
+  }
+  return skillArchiveBytes;
+}
 
 type CreateTaskBody = {
   /** 用户自然语言问题；可为空，走默认模板 */
@@ -35,7 +50,20 @@ app.get("/api/health", (c) =>
     repo: c.env.AGENT_REPO_URL || "none",
     skillBundled: true,
     skillArchiveBytes: SKILL_ARCHIVE_BYTES,
+    skillArchiveSha256: SKILL_ARCHIVE_SHA256,
     skillRoot: SKILL_ROOT_REL,
+  }),
+);
+
+/** 内嵌技能包：云端 Agent 用一条短命令拉取并解压，避免把整包塞进 prompt */
+app.get("/skill.tgz", () =>
+  new Response(getSkillArchive(), {
+    headers: {
+      "Content-Type": "application/gzip",
+      "Content-Length": String(SKILL_ARCHIVE_BYTES),
+      "Cache-Control": "public, max-age=300",
+      "X-Skill-Sha256": SKILL_ARCHIVE_SHA256,
+    },
   }),
 );
 
@@ -73,7 +101,8 @@ app.post("/api/tasks", async (c) => {
   }
 
   const userPrompt = body.prompt && body.prompt.trim();
-  const text = buildTaskPrompt(userPrompt);
+  const baseUrl = (c.env.PUBLIC_BASE_URL || new URL(c.req.url).origin).replace(/\/+$/, "");
+  const text = buildTaskPrompt(`${baseUrl}/skill.tgz`, userPrompt);
 
   const payload: Record<string, unknown> = {
     name: "geo-sleuth-web",
@@ -228,32 +257,29 @@ app.all("*", async (c) => {
 
 export default app;
 
-/** 组装任务提示：内嵌技能包写入工作区，禁止远程下载/安装技能 */
-function buildTaskPrompt(userPrompt?: string): string {
+/** 组装任务提示：技能包只从本服务后端拉取（内嵌于 Worker），禁止从 GitHub/npm 安装 */
+function buildTaskPrompt(skillUrl: string, userPrompt?: string): string {
   const parts = [
     "你是照片地理定位助手。",
     "",
     "## 硬性约束",
-    "- **禁止** `git clone` / `npx skills` / curl/wget 下载 geo-sleuth 或任何技能包。",
-    "- **禁止** 访问 GitHub/npm 去安装本技能。技能只能来自下方后端内嵌归档。",
-    "- 依赖库（如 uv 按脚本头部声明安装）可以按 SKILL 正常安装；但技能源码本身不得远程获取。",
+    "- **禁止** `git clone` / `npx skills` / 从 GitHub、npm 等第三方来源获取 geo-sleuth 或任何技能包。",
+    "- 技能只能来自下方本服务后端提供的内嵌归档，并且必须通过 sha256 校验。",
+    "- 依赖库（如 uv 按脚本头部声明安装）可以按 SKILL 正常安装。",
     "",
     "## 第一步：把内嵌技能写入工作区",
-    "在仓库根目录执行（一次性）：",
+    "在工作目录执行下面这段命令（原样执行，一次即可）：",
     "",
     "```bash",
-    "python3 <<'PY'",
-    "import base64, io, tarfile, pathlib",
-    `blob = base64.b64decode('${SKILL_ARCHIVE_BASE64}')`,
-    "root = pathlib.Path('.agents/skills')",
-    "root.mkdir(parents=True, exist_ok=True)",
-    "with tarfile.open(fileobj=io.BytesIO(blob), mode='r:gz') as tf:",
-    "    tf.extractall(path=root)",
-    "print('skill ready:', (root / 'geo-sleuth' / 'SKILL.md').resolve())",
-    "PY",
+    "mkdir -p .agents/skills",
+    `curl -fsSL "${skillUrl}" -o /tmp/geo-sleuth.tgz`,
+    `echo "${SKILL_ARCHIVE_SHA256}  /tmp/geo-sleuth.tgz" | sha256sum -c -`,
+    "tar -xzf /tmp/geo-sleuth.tgz -C .agents/skills",
     `export CLAUDE_SKILL_DIR="$PWD/${SKILL_ROOT_REL}"`,
-    "test -f \"$CLAUDE_SKILL_DIR/SKILL.md\"",
+    "test -f \"$CLAUDE_SKILL_DIR/SKILL.md\" && echo skill ready",
     "```",
+    "",
+    "若校验失败或下载失败，直接报告错误并停止，不要改用其他来源。",
     "",
     "## 第二步：按技能分析附图",
     `1. 阅读 \`${SKILL_ROOT_REL}/SKILL.md\`，严格按其流程调用 \`scripts/\`（Python 3.10+、uv run）。`,

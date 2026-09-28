@@ -3,6 +3,7 @@
  * 运行：node scripts/pack-skill.mjs
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,11 +31,13 @@ execFileSync(
 const buf = readFileSync(tmpTar);
 const b64 = buf.toString("base64");
 const bytes = buf.length;
+const sha256 = createHash("sha256").update(buf).digest("hex");
 
 const source = `/* eslint-disable */
 // 由 scripts/pack-skill.mjs 自动生成，请勿手改
 export const SKILL_ARCHIVE_BASE64 = ${JSON.stringify(b64)};
 export const SKILL_ARCHIVE_BYTES = ${bytes};
+export const SKILL_ARCHIVE_SHA256 = ${JSON.stringify(sha256)};
 export const SKILL_ROOT_REL = ".agents/skills/geo-sleuth";
 `;
 

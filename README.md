@@ -11,7 +11,7 @@
 浏览器 UI ──► Cloudflare Worker ──► Cursor Cloud Agent
                  │                      │
                  ├─ 不存用户 Key         ├─ 默认无仓库（AGENT_REPO_URL=none）
-                 └─ 内嵌 skill 归档 ──► 写入工作区 .agents/skills/geo-sleuth
+                 └─ 内嵌 skill 归档（/skill.tgz）──► Agent 拉取校验后解压到 .agents/skills/geo-sleuth
                                         （禁止 git clone / npx skills 装技能）
 ```
 
@@ -30,8 +30,9 @@
 2. 执行 `npm run pack:skill`（`npm run dev` / `deploy` 前会自动跑）  
 3. 重新部署或重启本地 `wrangler dev`
 
-创建任务时，Worker 把归档写进 prompt，要求 Agent 解压到 `.agents/skills/geo-sleuth`，并禁止远程下载/安装该技能。  
-（脚本运行所需的 Python/`uv` 依赖仍可按 SKILL 正常安装；禁止的是再去拉 skill 源码。）
+归档内嵌在 Worker 代码里，由本服务的 `GET /skill.tgz` 直接输出。创建任务时，prompt 只带一段短命令：Agent 从本服务拉取归档，用 sha256 校验后解压到 `.agents/skills/geo-sleuth`。禁止从 GitHub/npm 等第三方来源获取技能。  
+（不再把整包 base64 塞进 prompt：约 400KB 的内容需要模型原样复述进命令，会导致 Agent 卡死。）  
+（脚本运行所需的 Python/`uv` 依赖仍可按 SKILL 正常安装。）
 
 ## 本地运行
 
@@ -62,6 +63,7 @@ npm run deploy
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
+| `PUBLIC_BASE_URL` | 线上地址 | 云端 Agent 拉取 `/skill.tgz` 的地址；本地开发也须指向公网可访问的部署 |
 | `AGENT_REPO_URL` | `none` | `none`/空 = 无仓库 Agent；也可填**你自己**已连接 Cursor 的 GitHub 仓 |
 | `AGENT_REPO_REF` | `main` | 仅当绑定了仓库时有效 |
 | `AGENT_MODEL_ID` | （账号默认） | 可选，如 `composer-2` |
@@ -75,7 +77,8 @@ npm run deploy
 | `POST` | `/api/tasks` | 创建任务；头 `X-Cursor-Api-Key`；体：`imageBase64`、`mimeType`、可选 `prompt` |
 | `GET` | `/api/tasks/:agentId/:runId` | 轮询状态与结果；需带同一 Key |
 | `POST` | `/api/tasks/:agentId/:runId/cancel` | 取消 run |
-| `GET` | `/api/health` | 健康检查（含 `skillBundled`） |
+| `GET` | `/api/health` | 健康检查（含 `skillBundled`、`skillArchiveSha256`） |
+| `GET` | `/skill.tgz` | 内嵌技能归档，供云端 Agent 拉取 |
 
 Key 仅经请求头透传，服务端不落库。
 
