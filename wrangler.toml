@@ -13,8 +13,8 @@ not_found_handling = "single-page-application"
 #   npx wrangler kv namespace create AGENT_POOL --preview
 [[kv_namespaces]]
 binding = "AGENT_POOL"
-id = "00000000000000000000000000000001"
-preview_id = "00000000000000000000000000000002"
+id = "9c7562cb711e41ba9be6413d95ce6c64"
+preview_id = "d96ffd999cd14689b660b5286d044996"
 
 [vars]
 # 云端 Agent 从这里的 /skill.tgz 拉取内嵌技能包；本地 wrangler dev 时云端访问不到 localhost，所以固定写线上地址
