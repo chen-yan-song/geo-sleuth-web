@@ -1,0 +1,16 @@
+name = "geo-sleuth-web"
+main = "worker/src/index.ts"
+compatibility_date = "2025-03-01"
+
+[assets]
+directory = "./web"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[vars]
+# none / 留空：无仓库 Cloud Agent（推荐）。技能由 Worker 内嵌包注入，不远程安装。
+# 若填写，须为「你自己 GitHub 上、且已连接 Cursor」的仓库；不要填 Oldcircle/geo-sleuth。
+AGENT_REPO_URL = "none"
+AGENT_REPO_REF = "main"
+# 可选：覆盖默认模型
+# AGENT_MODEL_ID = "composer-2"

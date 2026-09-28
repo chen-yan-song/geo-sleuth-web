@@ -1,0 +1,12 @@
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+*.log
+.DS_Store
+# 打包中间产物；正式归档在 worker/src/generated/skill-archive.ts
+.wrangler/geo-sleuth-skill.tgz
+
+# 重复副本（源码以 .agents/skills/geo-sleuth 为准）
+.cursor/skills/
+agent-repo/

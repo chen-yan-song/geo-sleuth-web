@@ -1,0 +1,25 @@
+{
+  "name": "geo-sleuth-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "pack:skill": "node scripts/pack-skill.mjs",
+    "predev": "npm run pack:skill",
+    "predeploy": "npm run pack:skill",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "npm run pack:skill && tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.7.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250317.0",
+    "typescript": "^5.8.2",
+    "wrangler": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

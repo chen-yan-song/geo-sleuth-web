@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Geo Sleuth Web · 照片定位</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark">GS</span>
+        <div>
+          <p class="brand-name">Geo Sleuth Web</p>
+          <p class="brand-sub">Cloud Agent · 自带 Cursor Key</p>
+        </div>
+      </div>
+      <a
+        class="doc-link"
+        href="https://cursor.com/dashboard?tab=integrations"
+        target="_blank"
+        rel="noreferrer"
+        >获取 API Key</a
+      >
+    </header>
+
+    <main class="layout">
+      <section class="panel input-panel">
+        <h1>找拍摄地点，并推荐近同机位照片</h1>
+        <p class="lede">
+          上传照片后，将调用 Cursor Cloud Agent 按
+          <code>geo-sleuth</code> 技能分析。Key 仅用于本次请求，服务端不持久保存。
+        </p>
+
+        <label class="field">
+          <span>Cursor API Key</span>
+          <input
+            id="apiKey"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="粘贴你的 Cursor API Key"
+          />
+        </label>
+        <label class="remember">
+          <input id="rememberKey" type="checkbox" />
+          记住到本机 sessionStorage（关闭标签页后清除）
+        </label>
+
+        <label class="field">
+          <span>补充说明（可选）</span>
+          <textarea
+            id="prompt"
+            rows="3"
+            placeholder="例如：更关注东亚候选；优先给出可点击的同类图链接"
+          ></textarea>
+        </label>
+
+        <div class="drop" id="dropzone">
+          <input id="file" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden />
+          <p class="drop-title">拖入照片，或点击选择</p>
+          <p class="drop-hint">jpeg / png / gif / webp · 建议 &lt; 10MB</p>
+          <img id="preview" class="preview" alt="" hidden />
+        </div>
+
+        <div class="actions">
+          <button id="submit" type="button" class="btn primary" disabled>
+            开始分析
+          </button>
+          <button id="cancel" type="button" class="btn ghost" disabled>
+            取消任务
+          </button>
+        </div>
+        <p class="legal">
+          仅分析你有权处理的照片。费用由你填写的 Cursor Key 承担。分析可能需数分钟至更久。
+        </p>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="status-row">
+          <span class="status-dot" id="statusDot" data-state="idle"></span>
+          <span id="statusText">待命</span>
+        </div>
+        <div id="meta" class="meta" hidden></div>
+        <article id="result" class="result empty">
+          结果会显示在这里。提交后可离开页面轮询同一任务（需保留 Key 与任务 ID）。
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
