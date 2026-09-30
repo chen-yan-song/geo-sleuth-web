@@ -7,6 +7,15 @@ directory = "./web"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
+# Per-API-key sticky / warm Cursor Agent pool (stores hashed key → agentId only).
+# Create namespaces, then set real ids before production deploy:
+#   npx wrangler kv namespace create AGENT_POOL
+#   npx wrangler kv namespace create AGENT_POOL --preview
+[[kv_namespaces]]
+binding = "AGENT_POOL"
+id = "9c7562cb711e41ba9be6413d95ce6c64"
+preview_id = "d96ffd999cd14689b660b5286d044996"
+
 [vars]
 # 云端 Agent 从这里的 /skill.tgz 拉取内嵌技能包；本地 wrangler dev 时云端访问不到 localhost，所以固定写线上地址
 PUBLIC_BASE_URL = "https://geo-sleuth-web.yifan2848.workers.dev"

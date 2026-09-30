@@ -36,7 +36,7 @@
         <h1>找拍摄地点，并推荐近同机位照片</h1>
         <p class="lede">
           上传照片后，将调用 Cursor Cloud Agent 按
-          <code>geo-sleuth</code> 技能分析。Key 仅用于本次请求，服务端不持久保存。
+          <code>geo-sleuth</code> 技能分析。同一 API Key 会复用暖机 Agent（跳过冷启动）；Key 本身不落库，仅存 Key 的哈希与 agentId。
         </p>
 
         <label class="field">
@@ -53,6 +53,9 @@
           <input id="rememberKey" type="checkbox" />
           记住到本机 sessionStorage（关闭标签页后清除）
         </label>
+        <p class="warm-note" id="poolNote">
+          可选：先点「预热环境」安装 skill + pillow/playwright/RapidOCR；之后分析任务会跟进到同一 Agent。
+        </p>
 
         <label class="field">
           <span>补充说明（可选）</span>
@@ -73,6 +76,9 @@
         <div class="actions">
           <button id="submit" type="button" class="btn primary" disabled>
             开始分析
+          </button>
+          <button id="warmup" type="button" class="btn ghost" disabled>
+            预热环境
           </button>
           <button id="cancel" type="button" class="btn ghost" disabled>
             取消任务
